@@ -1,0 +1,1 @@
+curl -vvv --interface utun9 -d '{"key1":"value1", "key2":"value2"}' -H "Content-Type: application/json" -X POST http://10.0.0.1:3000/data
