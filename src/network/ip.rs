@@ -1,11 +1,11 @@
 use crate::proto::{
+    NetworkBuffer, Protocol,
     icmp::Icmp,
     ip::{Ip, IpHeaderWriter},
     tcp::Tcp,
-    NetworkBuffer, Protocol,
 };
 
-use super::{icmp::IcmpHandler, tcp::TcpHandler, Handler};
+use super::{Handler, icmp::IcmpHandler, tcp::TcpHandler};
 
 pub struct IpHandler {
     pub icmp: IcmpHandler,
@@ -16,7 +16,7 @@ impl Handler<Ip<'_>> for IpHandler {
     type Retrun = NetworkBuffer;
 
     fn handle(&mut self, ip_header: Ip) -> anyhow::Result<Self::Retrun> {
-        println!("IpHeader: {}", ip_header);
+        tracing::info!("IpHeader: {}", ip_header);
 
         let ttl = ip_header.ttl();
         let src = ip_header.source();

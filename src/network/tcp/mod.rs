@@ -1,16 +1,18 @@
 mod connections;
 mod state;
 
+use std::sync::Arc;
+
 use anyhow::bail;
 use connections::TcpConnections;
 
 use crate::proto::{
-    ip::Ip,
-    tcp::{Tcp, TcpControl, TcpHeaderWriter},
     NetworkBuffer,
+    ip::Ip,
+    tcp::{Tcp, TcpControl},
 };
 
-use super::{http::HttpHandler, Handler};
+use super::{Handler, http::HttpHandler};
 
 pub struct TcpHandler {
     listen_port: u16,
@@ -19,10 +21,10 @@ pub struct TcpHandler {
 }
 
 impl TcpHandler {
-    pub fn new(port: u16, handler: HttpHandler) -> Self {
+    pub fn new(port: u16, handler: HttpHandler, nic: Arc<tun::Device>) -> Self {
         Self {
             listen_port: port,
-            connections: Default::default(),
+            connections: TcpConnections::new(nic),
             higher_level_handler: handler,
         }
     }
@@ -31,7 +33,7 @@ impl TcpHandler {
 impl Handler<Tcp<Ip<'_>>> for TcpHandler {
     type Retrun = NetworkBuffer;
     fn handle(&mut self, tcp_header: Tcp<Ip>) -> anyhow::Result<Self::Retrun> {
-        println!("TcpHeader: {}", tcp_header);
+        tracing::info!("TcpHeader: {}", tcp_header);
 
         if tcp_header.destination_port() != self.listen_port {
             bail!(
@@ -41,23 +43,25 @@ impl Handler<Tcp<Ip<'_>>> for TcpHandler {
             )
         }
 
-        let connection = self.connections.get(&tcp_header);
+        let (connection, quad) = self.connections.get(&tcp_header);
 
-        let (msg, writer) = match connection.handle(tcp_header)? {
-            state::TcpControlMessage::None(tcp, writer) => (tcp, writer),
+        let msg = match connection.handle(tcp_header)? {
+            state::TcpControlMessage::None(tcp) => tcp,
             state::TcpControlMessage::Intercepted(tcp_control_message) => {
-                return Ok(tcp_control_message)
+                return Ok(tcp_control_message);
+            }
+            state::TcpControlMessage::Closed => {
+                self.connections.remove(quad);
+                return Ok(NetworkBuffer::empty());
             }
         };
 
-        let (buf, msg) = self.higher_level_handler.handle(msg)?;
-
-        let msg = if !buf.is_empty() || msg.control().contains(TcpControl::PSH) {
-            writer.data(buf).calc_checksum(msg.inner()).to_buf()
+        let (buf, msg) = if msg.control().contains(TcpControl::PSH) {
+            self.higher_level_handler.handle(msg)?
         } else {
-            buf
+            (NetworkBuffer::empty(), msg)
         };
 
-        Ok(msg)
+        Ok(connection.send(buf, msg))
     }
 }

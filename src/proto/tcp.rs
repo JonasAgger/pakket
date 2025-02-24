@@ -1,4 +1,4 @@
-use std::{fmt::Display, net::Ipv4Addr};
+use std::fmt::Display;
 
 use crate::utils;
 
@@ -86,8 +86,12 @@ impl TcpHeaderWriter {
     }
 
     pub fn data(mut self, data: NetworkBuffer) -> Self {
-        self.buf.extend(data);
-        self
+        if !data.is_empty() {
+            self.buf.extend(data);
+            self.set(TcpControl::PSH)
+        } else {
+            self
+        }
     }
 
     pub fn set(mut self, control: TcpControl) -> Self {

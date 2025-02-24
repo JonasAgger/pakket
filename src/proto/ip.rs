@@ -5,7 +5,6 @@ use crate::utils;
 use super::{NetworkBuffer, Protocol, ProtocolBuffer};
 
 use anyhow::Result;
-use etherparse::IpNumber;
 
 const IP_HEADER_LEN_MIN: usize = 20;
 
