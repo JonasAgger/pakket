@@ -7,6 +7,7 @@ pub mod http;
 pub mod icmp;
 pub mod ip;
 pub mod tcp;
+pub mod udp;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Protocol {
@@ -23,7 +24,7 @@ impl From<u8> for Protocol {
             1 => Self::ICMP,
             3 => Self::GatewayToGateway,
             6 => Self::TCP,
-            7 => Self::UDP,
+            17 => Self::UDP,
             other => Self::Unknown(other),
         }
     }
@@ -35,7 +36,7 @@ impl From<Protocol> for u8 {
             Protocol::ICMP => 1,
             Protocol::GatewayToGateway => 3,
             Protocol::TCP => 6,
-            Protocol::UDP => 7,
+            Protocol::UDP => 17,
             Protocol::Unknown(val) => val,
         }
     }
@@ -65,6 +66,21 @@ impl NetworkBuffer {
     }
 }
 
+impl<T: AsRef<[u8]>> From<T> for NetworkBuffer {
+    fn from(value: T) -> Self {
+        let data = value.as_ref();
+        let mut nb = NetworkBuffer::new(data.len());
+        nb.extend_from_slice(data);
+        nb
+    }
+}
+
+impl ProtocolBuffer for NetworkBuffer {
+    fn buf(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Deref for NetworkBuffer {
     type Target = Vec<u8>;
 
@@ -76,5 +92,11 @@ impl Deref for NetworkBuffer {
 impl DerefMut for NetworkBuffer {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl Display for NetworkBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Buf")
     }
 }

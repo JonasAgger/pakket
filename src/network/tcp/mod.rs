@@ -30,9 +30,10 @@ impl TcpHandler {
     }
 }
 
-impl Handler<Tcp<Ip<'_>>> for TcpHandler {
-    type Retrun = NetworkBuffer;
-    fn handle(&mut self, tcp_header: Tcp<Ip>) -> anyhow::Result<Self::Retrun> {
+impl Handler<Ip<'_>> for TcpHandler {
+    type ReturnType = NetworkBuffer;
+    fn handle(&mut self, ip: Ip) -> anyhow::Result<Self::ReturnType> {
+        let tcp_header = Tcp::parse(ip)?;
         tracing::info!("TcpHeader: {}", tcp_header);
 
         if tcp_header.destination_port() != self.listen_port {

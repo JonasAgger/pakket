@@ -93,8 +93,8 @@ pub struct TcpSequences {
 }
 
 impl<'a> Handler<Tcp<Ip<'a>>> for TcpState {
-    type Retrun = TcpControlMessage<'a>;
-    fn handle(&mut self, msg: Tcp<Ip<'a>>) -> anyhow::Result<Self::Retrun> {
+    type ReturnType = TcpControlMessage<'a>;
+    fn handle(&mut self, msg: Tcp<Ip<'a>>) -> anyhow::Result<Self::ReturnType> {
         let tcp_control = msg.control();
 
         match self.state {

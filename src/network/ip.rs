@@ -1,21 +1,20 @@
 use crate::proto::{
     NetworkBuffer, Protocol,
-    icmp::Icmp,
     ip::{Ip, IpHeaderWriter},
-    tcp::Tcp,
 };
 
-use super::{Handler, icmp::IcmpHandler, tcp::TcpHandler};
+use super::{Handler, icmp::IcmpHandler, tcp::TcpHandler, udp::UdpHandler};
 
 pub struct IpHandler {
     pub icmp: IcmpHandler,
+    pub udp: UdpHandler,
     pub tcp: TcpHandler,
 }
 
 impl Handler<Ip<'_>> for IpHandler {
-    type Retrun = NetworkBuffer;
+    type ReturnType = NetworkBuffer;
 
-    fn handle(&mut self, ip_header: Ip) -> anyhow::Result<Self::Retrun> {
+    fn handle(&mut self, ip_header: Ip) -> anyhow::Result<Self::ReturnType> {
         tracing::info!("IpHeader: {}", ip_header);
 
         let ttl = ip_header.ttl();
@@ -24,12 +23,11 @@ impl Handler<Ip<'_>> for IpHandler {
         let protocol = ip_header.protocol();
 
         let mut inner = if ip_header.protocol() == Protocol::TCP {
-            let tcp = Tcp::parse(ip_header)?;
-            self.tcp.handle(tcp)?
+            self.tcp.handle(ip_header)?
+        } else if ip_header.protocol() == Protocol::UDP {
+            self.udp.handle(ip_header)?
         } else if ip_header.protocol() == Protocol::ICMP {
-            let icmp = Icmp::parse(ip_header)?;
-            self.icmp.handle(icmp)?;
-            NetworkBuffer::empty()
+            self.icmp.handle(ip_header)?
         } else {
             NetworkBuffer::empty()
         };

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use super::ProtocolBuffer;
+use super::{NetworkBuffer, ProtocolBuffer};
 
 #[derive(Default, Clone, Copy)]
 struct Ref {
@@ -17,7 +17,11 @@ pub struct HttpReq<P: ProtocolBuffer> {
     headers: Vec<Ref>,
 }
 
-pub struct HttpResp<P: ProtocolBuffer> {
+pub struct HttpResp {
+    inner: PackedHttpResp<NetworkBuffer>,
+}
+
+pub struct PackedHttpResp<P: ProtocolBuffer> {
     inner: P,
     data: Ref,
     version: Ref,
@@ -79,8 +83,10 @@ impl<P: ProtocolBuffer> HttpReq<P> {
         }
     }
 
-    pub fn method(&self) -> &str {
-        self.read(self.method)
+    pub fn method(&self) -> http::Method {
+        let start = self.method.start as usize;
+        let end = start + self.method.length as usize;
+        http::Method::from_bytes(&self.inner.buf()[start..end]).unwrap()
     }
 
     pub fn path(&self) -> &str {
@@ -102,12 +108,28 @@ impl<P: ProtocolBuffer> HttpReq<P> {
     fn read(&self, data_ref: Ref) -> &str {
         let start = data_ref.start as usize;
         let end = start + data_ref.length as usize;
-
         unsafe { std::str::from_utf8_unchecked(&self.inner.buf()[start..end]) }
     }
 }
 
-impl<P: ProtocolBuffer> HttpResp<P> {
+impl HttpResp {
+    pub fn ok() -> Self {
+        const RESPONSE: &[u8; 38] = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+
+        let mut buf = NetworkBuffer::new(38);
+        buf.extend_from_slice(RESPONSE);
+
+        let inner = PackedHttpResp::parse(buf);
+
+        Self { inner }
+    }
+
+    pub fn to_buf(self) -> NetworkBuffer {
+        self.inner.inner
+    }
+}
+
+impl<P: ProtocolBuffer> PackedHttpResp<P> {
     pub fn into_inner(self) -> P {
         self.inner
     }
@@ -214,7 +236,7 @@ impl<P: ProtocolBuffer> Display for HttpReq<P> {
     }
 }
 
-impl<P: ProtocolBuffer> Display for HttpResp<P> {
+impl<P: ProtocolBuffer> Display for PackedHttpResp<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "HttpResp")?;
         writeln!(f, "Code: {}", self.code())?;

@@ -4,8 +4,9 @@ pub mod http;
 pub mod icmp;
 pub mod ip;
 pub mod tcp;
+pub mod udp;
 
 pub trait Handler<P: ProtocolBuffer> {
-    type Retrun;
-    fn handle(&mut self, msg: P) -> anyhow::Result<Self::Retrun>;
+    type ReturnType;
+    fn handle(&mut self, msg: P) -> anyhow::Result<Self::ReturnType>;
 }
